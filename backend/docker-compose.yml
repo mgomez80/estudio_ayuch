@@ -1,0 +1,34 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: db-estudio_ayuch
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_estudio_ayuch
+    ports:
+      - "3312:3306"
+    volumes:
+      - ./docker/init:/docker-entrypoint-initdb.d
+    networks:
+      - estudio_ayuch_net
+
+  api:
+    build: .
+    container_name: backend-api-estudio_ayuch
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8005:8000"
+    depends_on:
+      - db
+    networks:
+      - estudio_ayuch_net
+      - agentes_net
+
+networks:
+  estudio_ayuch_net:
+    driver: bridge
+  agentes_net:
+    external: true

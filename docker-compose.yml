@@ -1,0 +1,54 @@
+# Stack completo Estudio Ayuch (VPS / deploy único)
+# Uso:  cp .env.example .env  &&  docker compose up -d --build
+# Nota: en la notebook local se sigue usando backend/docker-compose.yml
+#       (mismos nombres de contenedores: correr ambos a la vez da conflicto).
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: db-estudio_ayuch
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_estudio_ayuch
+    ports:
+      - "3312:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./backend/docker/init:/docker-entrypoint-initdb.d
+    networks:
+      - estudio_ayuch_net
+
+  api:
+    build: ./backend
+    container_name: backend-api-estudio_ayuch
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8005:8000"
+    depends_on:
+      - db
+    networks:
+      - estudio_ayuch_net
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8005}
+    container_name: frontend-estudio_ayuch
+    restart: unless-stopped
+    ports:
+      - "3008:80"
+    depends_on:
+      - api
+    networks:
+      - estudio_ayuch_net
+
+networks:
+  estudio_ayuch_net:
+    driver: bridge
+
+volumes:
+  db_data:

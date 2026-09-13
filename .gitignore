@@ -1,0 +1,17 @@
+# Dependencias y artefactos
+node_modules/
+dist/
+__pycache__/
+*.pyc
+
+# Entorno (credenciales) — copiar desde .env.example
+.env
+
+# Historial git de los repos originales por-proyecto
+backend/.git.bak/
+frontend/.git.bak/
+
+# Varios
+.playwright-mcp/
+*.log
+.DS_Store
