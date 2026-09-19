@@ -18,7 +18,18 @@ nano .env        # cambiar JWT_SECRET, credenciales DB y VITE_API_URL
 docker compose up -d --build
 ```
 
-Puertos: frontend **3008**, backend **8005** (solo localhost), MySQL **3312**.
+Puertos: frontend **3008**, backend **8005** (solo localhost), MySQL **3312** (solo localhost).
+
+### Seguridad (post best-practices)
+
+- El compose exige `MYSQL_ROOT_PASSWORD` en `.env` — sin default inseguro.
+- MySQL y backend publican solo en `127.0.0.1`; exponerlos al exterior queda a
+  cargo del reverse proxy (Apache/nginx).
+- `JWT_SECRET` obligatorio, sin valor por defecto (`openssl rand -hex 32`).
+- CORS restringido: orígenes configurables con `CORS_ORIGINS` (vacío = solo el
+  dev-server de Vite; en prod same-origin vía `/api` no hace falta).
+- La API agrega security headers en todas las respuestas (nosniff,
+  X-Frame-Options DENY, CSP, Referrer-Policy, Permissions-Policy).
 
 ### VITE_API_URL
 

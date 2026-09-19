@@ -9,10 +9,13 @@ services:
     container_name: db-estudio_ayuch
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      # Viene de .env (MYSQL_ROOT_PASSWORD). Sin default inseguro: el compose
+      # falla explícitamente si falta, en vez de usar una clave conocida.
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Defini MYSQL_ROOT_PASSWORD en el archivo .env}"
       MYSQL_DATABASE: db_estudio_ayuch
     ports:
-      - "3312:3306"
+      # Bind solo a localhost: la DB no debe ser alcanzable desde fuera del VPS.
+      - "127.0.0.1:3312:3306"
     volumes:
       - db_data:/var/lib/mysql
       - ./backend/docker/init:/docker-entrypoint-initdb.d
@@ -36,7 +39,10 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8005}
+        # Same-origin a través del proxy /api de nginx (ver frontend/nginx.conf).
+        # No usar http://localhost:8005: ese host sería el navegador del usuario,
+        # no el servidor, y el login falla aunque usuario/clave sean correctos.
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: frontend-estudio_ayuch
     restart: unless-stopped
     ports:

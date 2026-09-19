@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuthStore } from "../store/authStore";
@@ -20,8 +21,18 @@ export default function Login() {
       const { data } = await api.post("/auth/login", { usuario, password });
       setSession(data.access_token, data.usuario);
       navigate("/");
-    } catch {
-      setError("Usuario o contraseña incorrectos.");
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        if (err.response?.status === 401) {
+          setError("Usuario o contraseña incorrectos.");
+        } else if (err.response) {
+          setError(`Error del servidor (${err.response.status}). Intentá de nuevo.`);
+        } else {
+          setError("No se pudo conectar con el servidor. Verificá la conexión o la URL de la API.");
+        }
+      } else {
+        setError("Error inesperado. Intentá de nuevo.");
+      }
     } finally {
       setLoading(false);
     }

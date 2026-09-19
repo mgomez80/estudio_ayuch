@@ -1,6 +1,9 @@
+from typing import Literal
+
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.core.auth_database import get_auth_db
@@ -9,21 +12,45 @@ from src.models.usuario import Usuario
 
 router = APIRouter(prefix="/config", tags=["Configuración"])
 
+ROLES_VALIDOS = ("admin", "gestor")
+
 
 class UsuarioCreate(BaseModel):
     loguin_usuario: str
     password: str
     nombre_completo: str
-    rol: str
+    rol: Literal["admin", "gestor"]
     perfiles_id_perfil: int | None = None
+
+    @field_validator("loguin_usuario")
+    @classmethod
+    def normalizar_loguin(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not v:
+            raise ValueError("loguin_usuario no puede estar vacío")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def validar_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("La contraseña debe tener al menos 8 caracteres")
+        return v
 
 
 class UsuarioUpdate(BaseModel):
     password: str | None = None
     nombre_completo: str | None = None
-    rol: str | None = None
+    rol: Literal["admin", "gestor"] | None = None
     perfiles_id_perfil: int | None = None
     activo: bool | None = None
+
+    @field_validator("password")
+    @classmethod
+    def validar_password(cls, v: str | None) -> str | None:
+        if v is not None and len(v) < 8:
+            raise ValueError("La contraseña debe tener al menos 8 caracteres")
+        return v
 
 
 class UsuarioOut(BaseModel):
@@ -74,8 +101,8 @@ def create_usuario(
     _admin: dict = Depends(get_current_admin),
 ):
     """Crea un nuevo usuario."""
-    # Validar que el login no exista
-    existing = db.query(Usuario).filter(Usuario.loguin_usuario == payload.loguin_usuario).first()
+    # Validar que el login no exista (case-insensitive)
+    existing = db.query(Usuario).filter(func.lower(Usuario.loguin_usuario) == payload.loguin_usuario).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El usuario ya existe")
 

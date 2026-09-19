@@ -4,10 +4,10 @@ services:
     container_name: db-estudio_ayuch
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: db_estudio_ayuch
     ports:
-      - "3312:3306"
+      - "127.0.0.1:3312:3306"
     volumes:
       - ./docker/init:/docker-entrypoint-initdb.d
     networks:

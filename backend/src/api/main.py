@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+import os
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -18,14 +20,46 @@ app = FastAPI(
     description="API interna para gestión de cuentas y contactos de Estudio Ayuch.",
 )
 
-# En dev, el frontend corre en otro puerto (ej. localhost:5173) -> hace falta CORS.
-# En producción con el proxy de nginx (/api same-origin) esto no se usa, pero no molesta dejarlo.
+# CORS restringido. En producción el frontend habla same-origin vía proxy
+# nginx (/api), así que la lista suele quedar vacía o con el dominio real.
+# Configurable por env: CORS_ORIGINS="https://midominio.com,https://www.midominio.com"
+# Default: solo orígenes de desarrollo local (Vite).
+_cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
+_cors_origins = (
+    [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+    if _cors_origins_env
+    else ["http://localhost:5173", "http://127.0.0.1:5173"]
+)
+if "*" in _cors_origins:
+    raise RuntimeError(
+        "CORS_ORIGINS no puede contener '*': esta API usa Authorization por header "
+        "y un origen comodín expone todos los endpoints a cualquier sitio."
+    )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: restringir a tu dominio real antes de ir a producción
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    allow_credentials=False,
+    max_age=600,
 )
+
+
+# Security headers (best-practices: OWASP/Lighthouse). La API no sirve HTML,
+# pero estos headers protegen también el /static y respuestas descargables.
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault(
+        "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
+    )
+    response.headers.setdefault(
+        "Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"
+    )
+    return response
 
 app.include_router(cuentas.router)
 app.include_router(auth.router)
