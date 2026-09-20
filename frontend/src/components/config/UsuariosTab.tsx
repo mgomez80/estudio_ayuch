@@ -94,8 +94,14 @@ export default function UsuariosTab() {
       setModalOpen(false);
       cargar();
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "No se pudo guardar el usuario.");
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      let mensaje = "No se pudo guardar el usuario.";
+      if (typeof detail === "string") {
+        mensaje = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        mensaje = detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(" / ") || mensaje;
+      }
+      toast.error(mensaje);
     } finally {
       setGuardando(false);
     }
@@ -204,8 +210,9 @@ export default function UsuariosTab() {
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     className="form-input"
                     required={editando == null}
-                    minLength={6}
+                    minLength={8}
                   />
+                  <p className="text-xs text-[var(--color-muted)] mt-1">Mínimo 8 caracteres.</p>
                 </div>
                 <div>
                   <label className="form-label">Nombre completo</label>
