@@ -50,8 +50,11 @@ export default function Contactos() {
   }, [cargar]);
 
   const abrirAlta = () => {
+    const ahora = new Date();
+    const fecha = ahora.toISOString().slice(0, 10);
+    const hora = ahora.toTimeString().slice(0, 5);
     setEditId(null);
-    setForm({ ...FORM_VACIO, sub_estados_id_sub_est: cuenta?.sub_estados_id_sub_est ?? 0 });
+    setForm({ ...FORM_VACIO, fecha_contacto: fecha, hora_contacto: hora, sub_estados_id_sub_est: cuenta?.sub_estados_id_sub_est ?? 0 });
     setModalOpen(true);
   };
 
