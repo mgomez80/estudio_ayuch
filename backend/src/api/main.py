@@ -9,7 +9,7 @@ from sqlalchemy import text
 from src.core.database import engine
 from src.routers import (
     cuentas, auth,
-    informe_telefonos, informe_contactos,
+    informe_telefonos, informe_contactos, informe_cuentas,
     contactos_gestion,
     carga_masiva, usuarios, perfiles, config_catalogos,
 )
@@ -65,6 +65,7 @@ app.include_router(cuentas.router)
 app.include_router(auth.router)
 app.include_router(informe_telefonos.router)
 app.include_router(informe_contactos.router)
+app.include_router(informe_cuentas.router)
 app.include_router(contactos_gestion.router)
 app.include_router(carga_masiva.router)
 app.include_router(usuarios.router)

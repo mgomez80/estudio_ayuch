@@ -15,6 +15,7 @@ const TelefonosDomicilios = lazy(() => import("./pages/sections/TelefonosDomicil
 const Contactos = lazy(() => import("./pages/sections/Contactos"));
 const InformeTelefonos = lazy(() => import("./pages/sections/InformeTelefonos"));
 const InformeContactos = lazy(() => import("./pages/sections/InformeContactos"));
+const InformeCuentas = lazy(() => import("./pages/sections/InformeCuentas"));
 
 const TODAS_LAS_SECCIONES = [...NAV_EXTRAJUDICIAL];
 
@@ -24,6 +25,7 @@ const COMPONENTES: Record<string, React.ComponentType> = {
   contactos: Contactos,
   informe_de_telefonos: InformeTelefonos,
   informes_contactos: InformeContactos,
+  informe_cuentas: InformeCuentas,
 };
 
 export default function App() {

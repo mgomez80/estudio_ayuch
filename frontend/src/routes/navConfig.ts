@@ -17,4 +17,5 @@ export const NAV_EXTRAJUDICIAL: NavItem[] = [
   { seccion: "contactos", label: "Contactos", icon: "fa-address-book", implementado: true, accent: "--color-contact" },
   { seccion: "informe_de_telefonos", label: "Informe de Teléfonos", icon: "fa-phone-alt", implementado: true, accent: "--color-info" },
   { seccion: "informes_contactos", label: "Informes de Contactos", icon: "fa-users", implementado: true, accent: "--color-info" },
+  { seccion: "informe_cuentas", label: "Informe de Cuentas", icon: "fa-file-invoice-dollar", implementado: true, accent: "--color-info" },
 ];
