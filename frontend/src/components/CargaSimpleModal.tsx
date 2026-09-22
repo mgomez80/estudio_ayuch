@@ -39,6 +39,10 @@ export default function CargaSimpleModal({ open, onClose }: { open: boolean; onC
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.id_subcli) {
+      toast.error("Seleccioná un subcliente.");
+      return;
+    }
     setGuardando(true);
     try {
       const { data } = await api.post("/cuentas/alta-simple", {
@@ -79,7 +83,7 @@ export default function CargaSimpleModal({ open, onClose }: { open: boolean; onC
     >
       <form id="form-carga-simple" onSubmit={guardar} className="space-y-3">
         <div>
-          <label className="form-label">Documento / CUIT</label>
+          <label className="form-label">Documento/Legago</label>
           <input
             type="text"
             inputMode="numeric"

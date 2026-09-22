@@ -12,21 +12,14 @@ interface UsuarioCat {
   nombre: string;
 }
 
-interface ClienteOpt {
-  id_cliente: number;
-  cuenta_cliente: number;
-  desc_cliente: string;
-}
-
-interface SubclienteOpt {
-  id_subcli: number;
-  nombre_subcli: string;
+interface SubEstadoOpt {
+  id_sub_est: number;
+  desc_sub_est: string;
 }
 
 interface FilaContacto {
   id_cta: number;
-  cliente: string | null;
-  subcliente: string | null;
+  subestado: string | null;
   matricula: string | null;
   razon_social: string | null;
   fecha: string | null;
@@ -39,11 +32,9 @@ export default function InformeContactos() {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [usuarioId, setUsuarioId] = useState("");
-  const [clienteId, setClienteId] = useState("");
-  const [subclienteId, setSubclienteId] = useState("");
+  const [subestadoId, setSubestadoId] = useState("");
   const [usuarios, setUsuarios] = useState<UsuarioCat[]>([]);
-  const [clientes, setClientes] = useState<ClienteOpt[]>([]);
-  const [subclientes, setSubclientes] = useState<SubclienteOpt[]>([]);
+  const [subestados, setSubestados] = useState<SubEstadoOpt[]>([]);
   const [filas, setFilas] = useState<FilaContacto[]>([]);
   const [loading, setLoading] = useState(false);
   const [exportando, setExportando] = useState(false);
@@ -54,8 +45,7 @@ export default function InformeContactos() {
     if (desde) p.set("desde", desde);
     if (hasta) p.set("hasta", hasta);
     if (usuarioId) p.set("usuario_id", usuarioId);
-    if (clienteId) p.set("cliente_id", clienteId);
-    if (subclienteId) p.set("subcliente_id", subclienteId);
+    if (subestadoId) p.set("subestado_id", subestadoId);
     return p.toString();
   };
 
@@ -76,13 +66,11 @@ export default function InformeContactos() {
     cargar();
     Promise.all([
       api.get<UsuarioCat[]>("/catalogos/ejecutivos"),
-      api.get<ClienteOpt[]>("/catalogos/clientes"),
-      api.get<SubclienteOpt[]>("/catalogos/subclientes"),
+      api.get<SubEstadoOpt[]>("/catalogos/sub_estados"),
     ])
-      .then(([u, c, s]) => {
+      .then(([u, s]) => {
         setUsuarios(u.data);
-        setClientes(c.data);
-        setSubclientes(s.data);
+        setSubestados(s.data);
       })
       .catch(() => toast.error("No se pudieron cargar los catálogos de filtros."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,22 +116,11 @@ export default function InformeContactos() {
           </select>
         </div>
         <div>
-          <label className="form-label">Cliente</label>
-          <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className="form-input">
+          <label className="form-label">Subestado</label>
+          <select value={subestadoId} onChange={(e) => setSubestadoId(e.target.value)} className="form-input">
             <option value="">Todos</option>
-            {clientes.map((c) => (
-              <option key={`${c.id_cliente}-${c.cuenta_cliente}`} value={c.id_cliente}>
-                {c.desc_cliente}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="form-label">Subcliente</label>
-          <select value={subclienteId} onChange={(e) => setSubclienteId(e.target.value)} className="form-input">
-            <option value="">Todos</option>
-            {subclientes.map((s) => (
-              <option key={s.id_subcli} value={s.id_subcli}>{s.nombre_subcli}</option>
+            {subestados.map((s) => (
+              <option key={s.id_sub_est} value={s.id_sub_est}>{s.desc_sub_est}</option>
             ))}
           </select>
         </div>
@@ -168,7 +145,7 @@ export default function InformeContactos() {
             <thead>
               <tr>
                 <th>Cuenta</th>
-                <th>Subcliente</th>
+                <th>Subestado</th>
                 <th>Matrícula</th>
                 <th>Razón social</th>
                 <th>Fecha</th>
@@ -181,7 +158,7 @@ export default function InformeContactos() {
               {filas.map((f, i) => (
                 <tr key={i}>
                   <td className="font-data">{f.id_cta}</td>
-                  <td>{f.subcliente ?? "—"}</td>
+                  <td>{f.subestado ?? "—"}</td>
                   <td className="font-data">{f.matricula ?? "—"}</td>
                   <td>{f.razon_social ?? "—"}</td>
                   <td className="font-data">{fmtFecha(f.fecha)}</td>
