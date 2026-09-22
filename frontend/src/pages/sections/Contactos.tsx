@@ -139,7 +139,7 @@ export default function Contactos() {
       )}
 
       {loading ? (
-        <TableSkeleton rows={5} cols={6} />
+        <TableSkeleton rows={5} cols={7} />
       ) : contactos.length === 0 ? (
         <EmptyState
           icon="fa-address-book-plus"
@@ -155,6 +155,7 @@ export default function Contactos() {
                 <th>Hora</th>
                 <th>Usuario</th>
                 <th>Nota</th>
+                <th>Subestado</th>
                 <th>Estado</th>
                 <th className="text-right">Acciones</th>
               </tr>
@@ -166,6 +167,7 @@ export default function Contactos() {
                   <td className="font-data">{c.hora_contacto ?? "—"}</td>
                   <td>{c.usuario_nombre ?? "—"}</td>
                   <td>{c.nota_contacto ?? "—"}</td>
+                  <td>{cuenta?.sub_estado_desc ?? "—"}</td>
                   <td><FlagBadge value={c.activo} labels={["Activo", "De baja"]} tones={["success", "neutral"]} /></td>
                   <td className="text-right whitespace-nowrap">
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => abrirEdicion(c)}>

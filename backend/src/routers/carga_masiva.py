@@ -341,7 +341,7 @@ def listar_sub_estados(
     db: Session = Depends(get_db), _user: dict = Depends(get_current_user)
 ):
     rows = db.execute(
-        text("SELECT id_sub_est, desc_sub_est FROM sub_estados ORDER BY id_sub_est")
+        text("SELECT id_sub_est, desc_sub_est FROM sub_estados WHERE activo='S' ORDER BY id_sub_est")
     ).all()
     return [{"id_sub_est": r[0], "desc_sub_est": r[1]} for r in rows]
 

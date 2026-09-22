@@ -141,7 +141,7 @@ def listar_subclientes(db: Session = Depends(get_db), _user: dict = Depends(get_
 @router.get("/catalogos/clientes")
 def listar_clientes(db: Session = Depends(get_db), _user: dict = Depends(get_current_user)):
     from src.models.cuentas import Cliente
-    filas = db.query(Cliente).order_by(Cliente.desc_cliente).all()
+    filas = db.query(Cliente).filter(Cliente.activo == "S").order_by(Cliente.desc_cliente).all()
     return [{"id_cliente": c.id_cliente, "cuenta_cliente": c.cuenta_cliente, "desc_cliente": c.desc_cliente} for c in filas]
 
 
