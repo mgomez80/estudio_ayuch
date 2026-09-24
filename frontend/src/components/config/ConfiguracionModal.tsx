@@ -95,6 +95,7 @@ export default function ConfiguracionModal({ onClose }: { onClose: () => void })
               campoActivo="activo"
               columnas={[
                 { key: "id_cliente", label: "ID CLIENTE", tipo: "number", soloTabla: true },
+                { key: "cuenta_cliente", label: "CUENTA CLIENTE", tipo: "number", requerido: true },
                 { key: "desc_cliente", label: "NOMBRE", tipo: "text", requerido: true },
               ]}
             />
