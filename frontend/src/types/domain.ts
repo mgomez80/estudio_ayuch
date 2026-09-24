@@ -96,6 +96,35 @@ export interface ContactoOut {
   activo: string | null;
 }
 
+export interface ConceptoCobroOut {
+  id_concepto: number;
+  desc_concepto: string;
+}
+
+export interface CobroOut {
+  id_cobros: number;
+  cuentas_id_cta: number;
+  fcha_cobro: string | null;
+  concepto: string | null;
+  importe: string | null;
+  rendido: string | null;
+  anulado: string | null;
+  anulado_por_nombre?: string | null;
+  anulado_ts?: string | null;
+}
+
+export interface FilaInformeCobro {
+  id_cobros: number;
+  fecha: string | null;
+  id_cta: number;
+  matricula: string | null;
+  razon_social: string | null;
+  concepto: string | null;
+  importe: string | null;
+  rendido: string | null;
+  anulado: string | null;
+}
+
 export interface ConvenioOut {
   id_convenios: number;
   fecha_convenio: string | null;
@@ -109,22 +138,6 @@ export interface ConvenioOut {
   observaciones_convenio?: string | null;
   cancelado: string | null;
   activo: string | null;
-}
-
-export interface CobroOut {
-  id_cobros: number;
-  fcha_cobro: string | null;
-  desc_cobro: string | null;
-  importe: string | null;
-  cuota: number | null;
-  rendidoy: string | null;
-  movimientos_id_mov: number | null;
-  convenios_id_convenios: number | null;
-  anulado?: string | null;
-  anulado_por?: number | null;
-  anulado_ts?: string | null;
-  anulado_por_nombre?: string | null;
-  concepto?: string | null;
 }
 
 export interface ReciboOut {

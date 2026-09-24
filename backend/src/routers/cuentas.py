@@ -201,31 +201,26 @@ def cobros_de_cuenta(
 ):
     """Pagos recibidos para una cuenta, más reciente primero. Incluye anulados (con trazabilidad)."""
     from src.models.usuario import Usuario
+    from src.models.catalogos import Concepto
     from src.routers.cobros_abm import CONCEPTO_PAGO_A_CUENTA
 
-    cobros = (
-        db.query(Cobro)
+    filas = (
+        db.query(Cobro, Concepto.desc_concepto)
+        .outerjoin(Concepto, Cobro.conceptos_id_concepto == Concepto.id_concepto)
         .filter(Cobro.cuentas_id_cta == id_cta)
         .order_by(Cobro.fcha_cobro.desc())
         .all()
     )
     out = []
-    for c in cobros:
+    for c, concepto_desc in filas:
         item = CobroOut.model_validate(c)
+        item.concepto = concepto_desc or CONCEPTO_PAGO_A_CUENTA
         if c.anulado == "S" and c.anulado_por:
             item.anulado_por_nombre = (
                 auth_db.query(Usuario.loguin_usuario)
                 .filter(Usuario.id_usuario == c.anulado_por)
                 .scalar()
             )
-        if c.convenios_id_convenios:
-            item.concepto = (
-                db.query(Convenio.estado_convenio)
-                .filter(Convenio.id_convenios == c.convenios_id_convenios)
-                .scalar()
-            )
-        else:
-            item.concepto = CONCEPTO_PAGO_A_CUENTA
         out.append(item)
     return out
 

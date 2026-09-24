@@ -13,9 +13,11 @@ import { NAV_EXTRAJUDICIAL } from "./routes/navConfig";
 const DatosCuenta = lazy(() => import("./pages/sections/DatosCuenta"));
 const TelefonosDomicilios = lazy(() => import("./pages/sections/TelefonosDomicilios"));
 const Contactos = lazy(() => import("./pages/sections/Contactos"));
+const Cobros = lazy(() => import("./pages/sections/Cobros"));
 const InformeTelefonos = lazy(() => import("./pages/sections/InformeTelefonos"));
 const InformeContactos = lazy(() => import("./pages/sections/InformeContactos"));
 const InformeCuentas = lazy(() => import("./pages/sections/InformeCuentas"));
+const InformeCobros = lazy(() => import("./pages/sections/InformeCobros"));
 
 const TODAS_LAS_SECCIONES = [...NAV_EXTRAJUDICIAL];
 
@@ -23,9 +25,11 @@ const COMPONENTES: Record<string, React.ComponentType> = {
   datos: DatosCuenta,
   teldom: TelefonosDomicilios,
   contactos: Contactos,
+  cobros: Cobros,
   informe_de_telefonos: InformeTelefonos,
   informes_contactos: InformeContactos,
   informe_cuentas: InformeCuentas,
+  informe_cobros: InformeCobros,
 };
 
 export default function App() {
