@@ -34,6 +34,8 @@ services:
       - db
     networks:
       - estudio_ayuch_net
+      # Red del MySQL de producción (contenedor "mysql" del stack docker-lamp).
+      - docker-lamp_backend
 
   frontend:
     build:
@@ -55,6 +57,8 @@ services:
 networks:
   estudio_ayuch_net:
     driver: bridge
+  docker-lamp_backend:
+    external: true
 
 volumes:
   db_data:
