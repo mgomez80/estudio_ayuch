@@ -2,7 +2,7 @@ import csv
 import io
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -153,49 +153,64 @@ def _limpiar(v):
     return v.strip() if isinstance(v, str) and v.strip() else (None if v in (None, "") else v)
 
 
-def _procesar_simple(db: Session, tabla_stg: str, conf) -> dict:
+def _borrar_fila_staging(db: Session, tabla_stg: str, cols: list[str], row) -> None:
+    """Borra del staging la fila recién promovida, por coincidencia exacta de todas sus
+    columnas (estas tablas no tienen PK propia). Alcanza con borrar 1 fila (LIMIT 1):
+    si hay duplicados exactos son indistinguibles entre sí y da igual cuál se borre."""
+    condiciones, params = [], {}
+    for c in cols:
+        v = row[c] if isinstance(row, dict) else getattr(row, c)
+        if v is None:
+            condiciones.append(f"`{c}` IS NULL")
+        else:
+            condiciones.append(f"`{c}` = :w_{c}")
+            params[f"w_{c}"] = v
+    where = " AND ".join(condiciones)
+    db.execute(text(f"DELETE FROM {tabla_stg} WHERE {where} LIMIT 1"), params)
+
+
+def _contar_restantes(db: Session, tabla_stg: str) -> int:
+    return db.execute(text(f"SELECT COUNT(*) FROM {tabla_stg}")).scalar() or 0
+
+
+def _procesar_simple(db: Session, tabla_stg: str, conf, lote: int) -> dict:
+    """Promueve hasta `lote` filas del staging a la tabla real. Cada fila se borra del
+    staging apenas se promueve con éxito, así una tanda con errores no bloquea ni repite
+    las que ya salieron bien; las filas con error quedan para corregir y reintentar."""
     tabla_real, mapa, defaults = conf
     stg_cols = list(mapa.keys())
     sel = ", ".join(f"`{c}`" for c in stg_cols)
-    filas = db.execute(text(f"SELECT {sel} FROM {tabla_stg}")).fetchall()
+    filas = db.execute(text(f"SELECT {sel} FROM {tabla_stg} LIMIT :lote"), {"lote": lote}).fetchall()
 
-    # Validación previa (MyISAM no tiene transacciones: no escribimos nada si algo falla).
-    errores = []
+    promovidas, errores = 0, []
     for i, row in enumerate(filas, start=1):
         d = dict(zip(stg_cols, row))
         if not _limpiar(d.get("matricula")):
             errores.append({"fila": i, "motivo": "matricula vacía"})
-    if errores:
-        return {"promovidas": 0, "errores": errores, "vaciado": False}
-
-    promovidas = 0
-    for i, row in enumerate(filas, start=1):
-        d = dict(zip(stg_cols, row))
+            continue
         real = {mapa[c]: _limpiar(v) for c, v in d.items()}
         real.update(defaults)
         cols = ", ".join(f"`{c}`" for c in real)
         params = ", ".join(f":{c}" for c in real)
         try:
             db.execute(text(f"INSERT INTO {tabla_real} ({cols}) VALUES ({params})"), real)
+            _borrar_fila_staging(db, tabla_stg, stg_cols, d)
             promovidas += 1
         except Exception as e:  # noqa: BLE001
             errores.append({"fila": i, "motivo": str(getattr(e, "orig", e))})
 
-    vaciado = not errores
-    if vaciado:
-        db.execute(text(f"DELETE FROM {tabla_stg}"))
     db.commit()
-    return {"promovidas": promovidas, "errores": errores, "vaciado": vaciado}
+    restantes = _contar_restantes(db, tabla_stg)
+    return {"promovidas": promovidas, "errores": errores, "restantes": restantes, "vaciado": restantes == 0}
 
 
-def _procesar_cuentas(db: Session, tabla_stg: str) -> dict:
+def _procesar_cuentas(db: Session, tabla_stg: str, lote: int) -> dict:
     cols = ["matricula", "nombre", "contacto", "monto_deuda", "fecha_deuda",
             "fecha_asignacion", "empleador", "cuenta_cliente", "id_sub_cliente",
             "observacion", "mora"]
     sel = ", ".join(f"`{c}`" for c in cols)
-    filas = db.execute(text(f"SELECT {sel} FROM {tabla_stg}")).fetchall()
+    filas = db.execute(text(f"SELECT {sel} FROM {tabla_stg} LIMIT :lote"), {"lote": lote}).fetchall()
 
-    # Validación previa: matricula y subcliente (obligatorio y numérico en cuentas).
     errores, validas = [], []
     for i, row in enumerate(filas, start=1):
         d = {c: _limpiar(v) for c, v in zip(cols, row)}
@@ -207,8 +222,6 @@ def _procesar_cuentas(db: Session, tabla_stg: str) -> dict:
             errores.append({"fila": i, "motivo": "id_sub_cliente vacío o no numérico"})
             continue
         validas.append((i, d, int(sub)))
-    if errores:
-        return {"promovidas": 0, "errores": errores, "vaciado": False}
 
     campos_cta = ["deudaact_cta", "fechaingreso_cta", "fecha_asignacion_cta",
                   "empleador_cta", "cuenta_cliente", "observacion_cta", "mora"]
@@ -251,31 +264,33 @@ def _procesar_cuentas(db: Session, tabla_stg: str) -> dict:
                 ci = ", ".join(f"`{k}`" for k in allc)
                 pi = ", ".join(f":{k}" for k in allc)
                 db.execute(text(f"INSERT INTO cuentas ({ci}) VALUES ({pi})"), allc)
+            _borrar_fila_staging(db, tabla_stg, cols, d)
             promovidas += 1
         except Exception as e:  # noqa: BLE001
             errores.append({"fila": i, "motivo": str(getattr(e, "orig", e))})
 
-    vaciado = not errores
-    if vaciado:
-        db.execute(text(f"DELETE FROM {tabla_stg}"))
     db.commit()
-    return {"promovidas": promovidas, "errores": errores, "vaciado": vaciado}
+    restantes = _contar_restantes(db, tabla_stg)
+    return {"promovidas": promovidas, "errores": errores, "restantes": restantes, "vaciado": restantes == 0}
 
 
 @router.post("/carga-masiva/{entidad}/procesar")
 async def procesar_carga(
     entidad: str,
+    lote: int = Query(200, ge=1, le=2000),
     db: Session = Depends(get_db),
     _user: dict = Depends(get_current_user),
 ):
-    """Promueve el staging a las tablas reales y, si no hubo errores, lo vacía."""
+    """Promueve hasta `lote` filas del staging a las tablas reales (en tandas, para no
+    agotar el timeout del proxy con cargas grandes). Llamar repetidas veces hasta que
+    la respuesta traiga restantes=0."""
     if entidad not in STAGING:
         raise HTTPException(status_code=400, detail=f"Entidad inválida: {entidad}")
     tabla_stg = STAGING[entidad][0]
     if entidad == "cuentas":
-        return _procesar_cuentas(db, tabla_stg)
+        return _procesar_cuentas(db, tabla_stg, lote)
     if entidad in PROMOCION_SIMPLE:
-        return _procesar_simple(db, tabla_stg, PROMOCION_SIMPLE[entidad])
+        return _procesar_simple(db, tabla_stg, PROMOCION_SIMPLE[entidad], lote)
     raise HTTPException(status_code=400,
                         detail=f"La promoción de '{entidad}' todavía no está soportada.")
 

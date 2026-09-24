@@ -187,6 +187,12 @@ export interface CargaMasivaResult {
   errores: { fila: number; motivo: string }[];
 }
 
+export interface ProcesarCargaResult {
+  promovidas: number;
+  errores: { fila: number; motivo: string }[];
+  restantes: number;
+}
+
 export interface CambioMasivoResult {
   afectadas: number;
   no_encontradas: string[];

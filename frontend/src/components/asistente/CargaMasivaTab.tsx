@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { api } from "../../api/client";
 import { toast } from "../../store/toastStore";
-import type { CargaMasivaResult } from "../../types/domain";
+import type { CargaMasivaResult, ProcesarCargaResult } from "../../types/domain";
 
 const ENTIDADES: { value: string; label: string; columnas: string[] }[] = [
   { value: "cuentas", label: "Cuentas", columnas: ["matricula", "nombre", "contacto", "monto_deuda", "fecha_deuda", "fecha_asignacion", "empleador", "cuenta_cliente", "id_sub_cliente", "observacion", "mora"] },
@@ -11,11 +11,9 @@ const ENTIDADES: { value: string; label: string; columnas: string[] }[] = [
   { value: "contactos", label: "Contactos", columnas: ["matricula", "accion", "resultado", "fecha_contacto", "hora_contacto", "nota"] },
 ];
 
-interface ProcesarResult {
-  promovidas: number;
-  errores: { fila: number; motivo: string }[];
-  vaciado: boolean;
-}
+// Tamaño de tanda para subir/procesar: evita que una carga grande agote el
+// timeout del proxy (nginx/Apache) en un único request de varios cientos de filas.
+const LOTE = 200;
 
 const PROMOCION_SOPORTADA = new Set(["cuentas", "telefonos", "direcciones", "mails"]);
 
@@ -23,8 +21,9 @@ export default function CargaMasivaTab() {
   const [entidad, setEntidad] = useState("cuentas");
   const [subiendo, setSubiendo] = useState(false);
   const [procesando, setProcesando] = useState(false);
+  const [progreso, setProgreso] = useState<{ actual: number; total: number } | null>(null);
   const [resultado, setResultado] = useState<CargaMasivaResult | null>(null);
-  const [resultadoProc, setResultadoProc] = useState<ProcesarResult | null>(null);
+  const [resultadoProc, setResultadoProc] = useState<ProcesarCargaResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const cfg = ENTIDADES.find((e) => e.value === entidad)!;
@@ -47,38 +46,81 @@ export default function CargaMasivaTab() {
     }
     setSubiendo(true);
     setResultado(null);
+    setResultadoProc(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const { data } = await api.post<CargaMasivaResult>(`/carga-masiva/${entidad}`, fd);
-      setResultado(data);
-      setResultadoProc(null);
-      toast.success(`${data.insertadas} fila(s) cargadas${data.errores.length ? `, ${data.errores.length} con error` : ""}.`);
+      const texto = await file.text();
+      const lineas = texto.split(/\r\n|\r|\n/).filter((l) => l.trim() !== "");
+      if (lineas.length === 0) {
+        toast.error("El CSV está vacío.");
+        return;
+      }
+
+      // Se sube en tandas de LOTE líneas: un archivo de varios cientos de filas
+      // en un único request puede superar el timeout del proxy.
+      const tandas: string[][] = [];
+      for (let i = 0; i < lineas.length; i += LOTE) tandas.push(lineas.slice(i, i + LOTE));
+
+      let insertadas = 0;
+      const errores: { fila: number; motivo: string }[] = [];
+      for (let t = 0; t < tandas.length; t++) {
+        setProgreso({ actual: t + 1, total: tandas.length });
+        const blob = new Blob([tandas[t].join("\n")], { type: "text/csv" });
+        const fd = new FormData();
+        fd.append("file", blob, file.name);
+        const { data } = await api.post<CargaMasivaResult>(`/carga-masiva/${entidad}`, fd);
+        insertadas += data.insertadas;
+        const offset = t * LOTE;
+        errores.push(...data.errores.map((e) => ({ ...e, fila: e.fila + offset })));
+      }
+
+      setResultado({ insertadas, errores });
+      toast.success(`${insertadas} fila(s) cargadas${errores.length ? `, ${errores.length} con error` : ""}.`);
       if (fileRef.current) fileRef.current.value = "";
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       toast.error(typeof detail === "string" ? detail : "No se pudo procesar el CSV.");
     } finally {
       setSubiendo(false);
+      setProgreso(null);
     }
   };
 
   const procesar = async () => {
     setProcesando(true);
+    setResultadoProc(null);
     try {
-      const { data } = await api.post<ProcesarResult>(`/carga-masiva/${entidad}/procesar`);
-      setResultadoProc(data);
-      if (data.vaciado) {
+      let promovidas = 0;
+      const errores: { fila: number; motivo: string }[] = [];
+      let restantes = 0;
+      // Llama al endpoint repetidas veces (tandas de LOTE filas) hasta vaciar el
+      // staging. Si una tanda no logra promover nada, corta para no loopear
+      // infinito sobre filas que siempre van a fallar (quedan para corregir).
+      while (true) {
+        const { data } = await api.post<ProcesarCargaResult>(
+          `/carga-masiva/${entidad}/procesar`,
+          null,
+          { params: { lote: LOTE } }
+        );
+        promovidas += data.promovidas;
+        errores.push(...data.errores);
+        restantes = data.restantes;
+        setProgreso({ actual: promovidas + errores.length, total: promovidas + errores.length + restantes });
+        if (data.promovidas === 0 || restantes === 0) break;
+      }
+
+      setResultadoProc({ promovidas, errores, restantes });
+      if (restantes === 0) {
         setResultado(null);
-        toast.success(`${data.promovidas} registro(s) cargados a las tablas reales. Staging vaciado.`);
+        toast.success(`${promovidas} registro(s) cargados a las tablas reales. Staging vaciado.`);
       } else {
-        toast.error(`${data.errores.length} error(es). No se vació el staging; corregí y reintentá.`);
+        toast.error(`${errores.length} error(es). Esas filas quedaron en el staging; corregí y reintentá.`);
       }
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       toast.error(typeof detail === "string" ? detail : "No se pudo procesar.");
     } finally {
       setProcesando(false);
+      setProgreso(null);
     }
   };
 
@@ -114,6 +156,17 @@ export default function CargaMasivaTab() {
           </button>
         )}
       </div>
+      {progreso && (subiendo || procesando) && (
+        <div className="text-xs text-[var(--color-ink-soft)]">
+          <div className="h-1.5 rounded-full bg-[var(--color-brand-soft)] overflow-hidden">
+            <div
+              className="h-full bg-[var(--color-brand)] transition-all"
+              style={{ width: `${Math.min(100, Math.round((progreso.actual / progreso.total) * 100))}%` }}
+            />
+          </div>
+          <p className="mt-1">{progreso.actual} / {progreso.total}</p>
+        </div>
+      )}
       {resultado && (
         <div className="border border-[var(--color-line)] rounded-lg p-3 text-sm">
           <p><strong>{resultado.insertadas}</strong> fila(s) insertadas.</p>
@@ -131,9 +184,9 @@ export default function CargaMasivaTab() {
         <div className="border border-[var(--color-line)] rounded-lg p-3 text-sm">
           <p>
             <strong>{resultadoProc.promovidas}</strong> registro(s) promovidos a tablas reales.{" "}
-            {resultadoProc.vaciado
+            {resultadoProc.restantes === 0
               ? <span className="text-[var(--color-success)]">Staging vaciado.</span>
-              : <span className="text-[var(--color-danger)]">Staging conservado (hubo errores).</span>}
+              : <span className="text-[var(--color-danger)]">Quedan {resultadoProc.restantes} fila(s) en el staging (con error).</span>}
           </p>
           {resultadoProc.errores.length > 0 && (
             <div className="mt-2">
