@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -99,17 +100,7 @@ def cambiar_sub_estado(
     return {"sub_estados_id_sub_est": sub_estado.id_sub_est, "estados_id_estado": sub_estado.estados_id_estado}
 
 
-@router.get("/{id_cta}", response_model=CuentaDetalleOut)
-def obtener_cuenta(
-    id_cta: int,
-    db: Session = Depends(get_db),
-    _user: dict = Depends(get_current_user),
-):
-    """Detalle completo de una cuenta: datos del deudor, cliente/subcliente, teléfonos, direcciones, mails."""
-    cuenta = db.query(Cuenta).filter(Cuenta.id_cta == id_cta).first()
-    if not cuenta:
-        raise HTTPException(status_code=404, detail=f"Cuenta {id_cta} no encontrada")
-
+def _construir_detalle(db: Session, cuenta: Cuenta) -> CuentaDetalleOut:
     entidad = db.query(Entidad).filter(Entidad.matricula_ent == cuenta.entidades_matricula_ent).first()
 
     estado = db.query(Estado).filter(Estado.id_estado == cuenta.estados_id_estado).first()
@@ -145,6 +136,101 @@ def obtener_cuenta(
         resultado.mails = entidad.mails
 
     return resultado
+
+
+@router.get("/{id_cta}", response_model=CuentaDetalleOut)
+def obtener_cuenta(
+    id_cta: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """Detalle completo de una cuenta: datos del deudor, cliente/subcliente, teléfonos, direcciones, mails."""
+    cuenta = db.query(Cuenta).filter(Cuenta.id_cta == id_cta).first()
+    if not cuenta:
+        raise HTTPException(status_code=404, detail=f"Cuenta {id_cta} no encontrada")
+    return _construir_detalle(db, cuenta)
+
+
+class CuentaUpdateIn(BaseModel):
+    matricula: Optional[str] = Field(None, min_length=1, max_length=30)
+    razon_social: Optional[str] = Field(None, min_length=1, max_length=200)
+    deudaact_cta: Optional[Decimal] = Field(None, ge=0)
+    deudatrans_cta: Optional[Decimal] = Field(None, ge=0)
+    empleador_cta: Optional[str] = Field(None, max_length=200)
+    observacion_cta: Optional[str] = Field(None, max_length=250)
+    subclientes_id_subcli: Optional[int] = None
+    cuenta_cliente: Optional[str] = Field(None, max_length=50)
+
+
+@router.patch("/{id_cta}", response_model=CuentaDetalleOut)
+def editar_cuenta(
+    id_cta: int,
+    payload: CuentaUpdateIn,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """Edita los datos de una cuenta, incluida la matrícula del deudor. Cambiar la
+    matrícula renombra la entidad y todo lo que cuelga de ella (otras cuentas del
+    mismo deudor, teléfonos, direcciones, mails) para no dejar registros huérfanos."""
+    cuenta = db.query(Cuenta).filter(Cuenta.id_cta == id_cta).first()
+    if not cuenta:
+        raise HTTPException(status_code=404, detail=f"Cuenta {id_cta} no encontrada")
+
+    if payload.subclientes_id_subcli is not None:
+        subcli = db.query(Subcliente).filter(
+            Subcliente.id_subcli == payload.subclientes_id_subcli,
+            Subcliente.activo_subcli == "S",
+        ).first()
+        if not subcli:
+            raise HTTPException(status_code=400, detail="Subcliente inexistente o inactivo")
+        cuenta.subclientes_id_subcli = payload.subclientes_id_subcli
+
+    if payload.matricula is not None:
+        nueva = payload.matricula.strip()
+        vieja = cuenta.entidades_matricula_ent
+        if nueva != vieja:
+            if db.query(Entidad).filter(Entidad.matricula_ent == nueva).first():
+                raise HTTPException(status_code=400, detail=f"Ya existe una entidad con matrícula {nueva}")
+            entidad = db.query(Entidad).filter(Entidad.matricula_ent == vieja).first()
+            if not entidad:
+                raise HTTPException(status_code=404, detail=f"Entidad {vieja} no encontrada")
+            # Todo lo que referencia la matrícula vieja por columna (no hay FK real
+            # en este esquema) se renombra primero; la entidad (su PK) se cambia al final.
+            from src.models.contactos import Telefono, Direccion, Mail
+            db.query(Cuenta).filter(Cuenta.entidades_matricula_ent == vieja).update(
+                {"entidades_matricula_ent": nueva}, synchronize_session=False)
+            db.query(Telefono).filter(Telefono.entidades_matricula_ent == vieja).update(
+                {"entidades_matricula_ent": nueva}, synchronize_session=False)
+            db.query(Direccion).filter(Direccion.entidades_matricula_ent == vieja).update(
+                {"entidades_matricula_ent": nueva}, synchronize_session=False)
+            db.query(Mail).filter(Mail.entidades_matricula_ent == vieja).update(
+                {"entidades_matricula_ent": nueva}, synchronize_session=False)
+            entidad.matricula_ent = nueva
+            # El bulk .update() de arriba no sincroniza el objeto ya cargado en
+            # memoria: sin esto, el resto del request seguiría viendo la matrícula
+            # vieja (rompiendo, por ejemplo, la edición de razón social debajo).
+            cuenta.entidades_matricula_ent = nueva
+            db.flush()
+
+    if payload.razon_social is not None:
+        entidad = db.query(Entidad).filter(Entidad.matricula_ent == cuenta.entidades_matricula_ent).first()
+        if entidad:
+            entidad.razon_social_ent = payload.razon_social.strip().upper()
+
+    if payload.deudaact_cta is not None:
+        cuenta.deudaact_cta = payload.deudaact_cta
+    if payload.deudatrans_cta is not None:
+        cuenta.deudatrans_cta = payload.deudatrans_cta
+    if payload.empleador_cta is not None:
+        cuenta.empleador_cta = payload.empleador_cta
+    if payload.observacion_cta is not None:
+        cuenta.observacion_cta = payload.observacion_cta
+    if payload.cuenta_cliente is not None:
+        cuenta.cuenta_cliente = payload.cuenta_cliente
+
+    db.commit()
+    db.refresh(cuenta)
+    return _construir_detalle(db, cuenta)
 
 
 @router.get("/{id_cta}/contactos", response_model=list[ContactoOut])
@@ -231,7 +317,6 @@ def cobros_de_cuenta(
 # Usado por el botón "Carga simple" del frontend.
 # ---------------------------------------------------------------------------
 from datetime import date as _date
-from decimal import Decimal
 
 
 class AltaSimpleIn(BaseModel):

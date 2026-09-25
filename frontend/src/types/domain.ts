@@ -106,6 +106,7 @@ export interface CobroOut {
   cuentas_id_cta: number;
   fcha_cobro: string | null;
   concepto: string | null;
+  detalle: string | null;
   importe: string | null;
   rendido: string | null;
   anulado: string | null;

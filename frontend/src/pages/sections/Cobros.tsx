@@ -11,7 +11,16 @@ import { toast } from "../../store/toastStore";
 import type { CobroOut, ConceptoCobroOut } from "../../types/domain";
 import { fmtFecha } from "../../lib/fecha";
 
-const FORM_VACIO = { fcha_cobro: "", conceptos_id_concepto: 0, importe: "", rendido: "N" };
+const FORM_VACIO = { fcha_cobro: "", conceptos_id_concepto: 0, importe: "", rendido: "N", detalle: "" };
+
+function mensajeError(err: unknown, fallback: string): string {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(" / ") || fallback;
+  }
+  return fallback;
+}
 
 export default function Cobros() {
   const { idCta } = useParams();
@@ -63,13 +72,13 @@ export default function Cobros() {
         conceptos_id_concepto: form.conceptos_id_concepto,
         importe: Number(form.importe),
         rendido: form.rendido,
+        detalle: form.detalle || null,
       });
       toast.success("Cobro cargado.");
       setModalOpen(false);
       cargar();
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "No se pudo cargar el cobro.");
+    } catch (err) {
+      toast.error(mensajeError(err, "No se pudo cargar el cobro."));
     } finally {
       setGuardando(false);
     }
@@ -125,6 +134,7 @@ export default function Cobros() {
               <tr>
                 <th>Fecha</th>
                 <th>Concepto</th>
+                <th>Detalle</th>
                 <th>Importe</th>
                 <th>Rendido</th>
                 <th>Estado</th>
@@ -136,6 +146,7 @@ export default function Cobros() {
                 <tr key={c.id_cobros}>
                   <td className="font-data">{fmtFecha(c.fcha_cobro)}</td>
                   <td>{c.concepto ?? "—"}</td>
+                  <td>{c.detalle ?? "—"}</td>
                   <td className="font-data">{dinero(Number(c.importe || 0))}</td>
                   <td><FlagBadge value={c.rendido} labels={["Sí", "No"]} tones={["success", "warning"]} /></td>
                   <td><FlagBadge value={c.anulado === "S" ? "N" : "S"} labels={["Vigente", "Anulado"]} tones={["success", "danger"]} /></td>
@@ -202,6 +213,15 @@ export default function Cobros() {
               onChange={(e) => setForm({ ...form, importe: e.target.value })}
               className="form-input"
               required
+            />
+          </div>
+          <div>
+            <label className="form-label">Detalle (opcional)</label>
+            <textarea
+              value={form.detalle}
+              onChange={(e) => setForm({ ...form, detalle: e.target.value })}
+              className="form-input"
+              rows={2}
             />
           </div>
           <div>

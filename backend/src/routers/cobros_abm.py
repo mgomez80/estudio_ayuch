@@ -43,6 +43,7 @@ class CobroCreateIn(BaseModel):
     conceptos_id_concepto: int
     importe: Decimal
     rendido: str = "N"
+    detalle: str | None = None
 
 
 class CobroOut(BaseModel):
@@ -52,6 +53,7 @@ class CobroOut(BaseModel):
     cuentas_id_cta: int
     fcha_cobro: date | None = None
     concepto: str | None = None
+    detalle: str | None = None
     importe: Decimal | None = None
     rendido: str | None = None
     anulado: str | None = None
@@ -78,6 +80,7 @@ def _cobro_a_out(cobro: Cobro, concepto_desc: str | None, anulado_por_nombre: st
         cuentas_id_cta=cobro.cuentas_id_cta,
         fcha_cobro=cobro.fcha_cobro,
         concepto=concepto_desc or CONCEPTO_PAGO_A_CUENTA,
+        detalle=cobro.desc_cobro,
         importe=cobro.importe,
         rendido=cobro.rendido,
         anulado=cobro.anulado,
@@ -126,7 +129,7 @@ def crear_cobro(
         conceptos_id_concepto=concepto.id_concepto,
         cuentas_id_cta=id_cta,
         fcha_cobro=payload.fcha_cobro,
-        desc_cobro=concepto.desc_concepto,
+        desc_cobro=(payload.detalle or "").strip() or None,
         importe=payload.importe,
         rendido=payload.rendido,
         anulado="N",

@@ -7,12 +7,14 @@ import { StatCard } from "../../components/ui/StatCard";
 import { FlagBadge } from "../../components/ui/Badge";
 import { toast } from "../../store/toastStore";
 import { fmtFecha } from "../../lib/fecha";
-import type { FilaInformeCobro } from "../../types/domain";
+import type { FilaInformeCobro, ConceptoCobroOut } from "../../types/domain";
 
 export default function InformeCobros() {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [rendido, setRendido] = useState("");
+  const [conceptoId, setConceptoId] = useState("");
+  const [conceptos, setConceptos] = useState<ConceptoCobroOut[]>([]);
   const [filas, setFilas] = useState<FilaInformeCobro[]>([]);
   const [loading, setLoading] = useState(false);
   const [exportando, setExportando] = useState(false);
@@ -23,6 +25,7 @@ export default function InformeCobros() {
     if (desde) params.set("desde", desde);
     if (hasta) params.set("hasta", hasta);
     if (rendido) params.set("rendido", rendido);
+    if (conceptoId) params.set("concepto_id", conceptoId);
     return params.toString();
   };
 
@@ -37,6 +40,9 @@ export default function InformeCobros() {
 
   useEffect(() => {
     cargar();
+    api.get<ConceptoCobroOut[]>("/catalogos/conceptos-cobro")
+      .then((response) => setConceptos(response.data))
+      .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -81,6 +87,15 @@ export default function InformeCobros() {
             <option value="">Todos</option>
             <option value="S">Sí</option>
             <option value="N">No</option>
+          </select>
+        </div>
+        <div>
+          <label className="form-label">Concepto</label>
+          <select value={conceptoId} onChange={(e) => setConceptoId(e.target.value)} className="form-input">
+            <option value="">Todos</option>
+            {conceptos.map((c) => (
+              <option key={c.id_concepto} value={c.id_concepto}>{c.desc_concepto}</option>
+            ))}
           </select>
         </div>
         <button type="button" className="btn btn-secondary" onClick={cargar} disabled={loading}>

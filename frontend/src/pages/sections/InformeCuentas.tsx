@@ -4,7 +4,6 @@ import { descargarExcel } from "../../api/download";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatCard } from "../../components/ui/StatCard";
-import { FlagBadge } from "../../components/ui/Badge";
 import { toast } from "../../store/toastStore";
 import { fmtFecha } from "../../lib/fecha";
 
@@ -15,20 +14,13 @@ interface SubEstadoOpt {
 
 interface FilaCuenta {
   id_cta: number;
-  subestado: string | null;
-  estado: string | null;
+  nombre: string | null;
   matricula: string | null;
-  razon_social: string | null;
-  cuenta_cliente: string | null;
-  cliente: string | null;
-  subcliente: string | null;
-  deuda_actual: string | null;
-  deuda_transferida: string | null;
   fecha_ingreso: string | null;
-  empleador: string | null;
-  judicial: string | null;
-  activa: string | null;
-  observacion: string | null;
+  fecha_ultimo_contacto: string | null;
+  ultimo_contacto: string | null;
+  fecha_ultimo_cobro: string | null;
+  monto: string | null;
 }
 
 export default function InformeCuentas() {
@@ -102,25 +94,26 @@ export default function InformeCuentas() {
       {!loading && filas.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4" style={{ opacity: pending ? 0.6 : 1 }}>
           <StatCard label="Cuentas" value={filas.length} icon="fa-file-invoice-dollar" tone="brand" />
-          <StatCard label="Activas" value={filas.filter((fila) => fila.activa === "S").length} icon="fa-circle-check" tone="success" />
         </div>
       )}
 
-      {loading ? <TableSkeleton rows={6} cols={10} /> : filas.length === 0 ? <EmptyState icon="fa-file-circle-xmark" title="Sin resultados" hint="Probá ajustar los filtros." /> : (
+      {loading ? <TableSkeleton rows={6} cols={8} /> : filas.length === 0 ? <EmptyState icon="fa-file-circle-xmark" title="Sin resultados" hint="Probá ajustar los filtros." /> : (
         <div className="overflow-x-auto rounded-lg border border-[var(--color-line)]" style={{ opacity: pending ? 0.6 : 1, transition: "opacity 0.15s" }}>
           <table className="data-table">
             <thead><tr>
-              <th>Cuenta</th><th>Subestado</th><th>Estado</th><th>Matrícula</th><th>Razón social</th>
-              <th>Cuenta cliente</th><th>Cliente</th><th>Subcliente</th><th>Deuda actual</th><th>Deuda transferida</th><th>Ingreso</th><th>Activa</th>
+              <th>Cuenta</th><th>Nombre</th><th>Matricula</th><th>Fecha Ingreso</th>
+              <th>Fecha Ult. Contacto</th><th>Ultimo Contacto</th><th>Fecha Ult. Cobro</th><th>Monto</th>
             </tr></thead>
             <tbody>{filas.map((fila) => (
               <tr key={fila.id_cta}>
                 <td className="font-data">{fila.id_cta}</td>
-                <td>{fila.subestado ?? "—"}</td><td>{fila.estado ?? "—"}</td>
-                <td className="font-data">{fila.matricula ?? "—"}</td><td>{fila.razon_social ?? "—"}</td><td className="font-data">{fila.cuenta_cliente ?? "—"}</td>
-                <td>{fila.cliente ?? "—"}</td><td>{fila.subcliente ?? "—"}</td>
-                <td className="font-data">{dinero(fila.deuda_actual)}</td><td className="font-data">{dinero(fila.deuda_transferida)}</td><td className="font-data">{fmtFecha(fila.fecha_ingreso)}</td>
-                <td><FlagBadge value={fila.activa} labels={["Activa", "Inactiva"]} tones={["success", "neutral"]} /></td>
+                <td>{fila.nombre ?? "—"}</td>
+                <td className="font-data">{fila.matricula ?? "—"}</td>
+                <td className="font-data">{fmtFecha(fila.fecha_ingreso)}</td>
+                <td className="font-data">{fmtFecha(fila.fecha_ultimo_contacto)}</td>
+                <td>{fila.ultimo_contacto ?? "—"}</td>
+                <td className="font-data">{fmtFecha(fila.fecha_ultimo_cobro)}</td>
+                <td className="font-data">{dinero(fila.monto)}</td>
               </tr>
             ))}</tbody>
           </table>

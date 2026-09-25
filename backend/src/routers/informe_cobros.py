@@ -32,6 +32,7 @@ def _consultar(
     desde: Optional[date] = None,
     hasta: Optional[date] = None,
     rendido: Optional[str] = None,
+    concepto_id: Optional[int] = None,
     incluir_anulados: bool = False,
 ):
     query = (
@@ -48,6 +49,8 @@ def _consultar(
         query = query.filter(Cobro.fcha_cobro <= hasta)
     if rendido in ("S", "N"):
         query = query.filter(Cobro.rendido == rendido)
+    if concepto_id:
+        query = query.filter(Cobro.conceptos_id_concepto == concepto_id)
 
     filas = []
     for cobro, matricula, razon_social, concepto_desc in query.order_by(Cobro.fcha_cobro.desc()).all():
@@ -72,10 +75,11 @@ def informe_cobros(
     desde: Optional[date] = Query(None),
     hasta: Optional[date] = Query(None),
     rendido: Optional[str] = Query(None, description="S=rendido, N=pendiente, omitir para todos"),
+    concepto_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     _user: dict = Depends(get_current_user),
 ):
-    return {"filas": _consultar(db, desde, hasta, rendido)}
+    return {"filas": _consultar(db, desde, hasta, rendido, concepto_id)}
 
 
 @router.get("/export")
@@ -83,7 +87,8 @@ def exportar_cobros(
     desde: Optional[date] = Query(None),
     hasta: Optional[date] = Query(None),
     rendido: Optional[str] = Query(None),
+    concepto_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     _user: dict = Depends(get_current_user),
 ):
-    return to_excel_response(_consultar(db, desde, hasta, rendido), COLUMNS, "informe_cobros.xlsx")
+    return to_excel_response(_consultar(db, desde, hasta, rendido, concepto_id), COLUMNS, "informe_cobros.xlsx")
