@@ -13,7 +13,6 @@ from src.models.catalogos import Accion, Resultado
 from src.models.contactos import Contacto
 from src.models.cuentas import Cuenta
 from src.models.financiero import Cobro
-from src.models.usuario import Usuario
 
 # La deuda se guarda como VARCHAR; casteamos para agregaciones (patrón asistente.py).
 DEUDA_NUM = cast(Cuenta.deudaact_cta, Numeric(20, 2))
@@ -115,10 +114,13 @@ def minar_gestion(db, desde, hasta, subcliente_id=None, estado_id=None, usuario_
         ~Cuenta.id_cta.in_(con_gestion))
     sin_gestion = q_sin.count()
 
-    top = [{"nombre": n, "cant": int(c)} for n, c in (
-        base.join(Usuario, Contacto.usuarios_id_usuario == Usuario.id_usuario)
-        .with_entities(Usuario.loguin_usuario, func.count())
-        .group_by(Usuario.loguin_usuario).order_by(func.count().desc()).limit(5).all())]
+    # Usuario vive en la DB de auth (otra conexión/base que Cuenta/Contacto):
+    # no se puede hacer JOIN contra ella desde esta sesión. Se agrupa por id
+    # y el nombre se resuelve aparte, contra auth_db (ver routers/asistente.py).
+    top = [{"usuario_id": uid, "cant": int(c)} for uid, c in (
+        base.filter(Contacto.usuarios_id_usuario.isnot(None))
+        .with_entities(Contacto.usuarios_id_usuario, func.count())
+        .group_by(Contacto.usuarios_id_usuario).order_by(func.count().desc()).limit(5).all())]
 
     return {"contactos": contactos, "por_accion": por_accion, "por_resultado": por_resultado,
             "tasa_compromiso": tasa, "sin_gestion_30d": sin_gestion, "top_gestores": top}
