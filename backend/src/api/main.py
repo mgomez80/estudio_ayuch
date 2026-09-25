@@ -12,7 +12,7 @@ from src.routers import (
     informe_telefonos, informe_contactos, informe_cuentas,
     contactos_gestion,
     carga_masiva, usuarios, perfiles, config_catalogos,
-    cobros_abm, informe_cobros,
+    cobros_abm, informe_cobros, entidades_abm,
 )
 
 app = FastAPI(
@@ -74,6 +74,7 @@ app.include_router(perfiles.router)
 app.include_router(config_catalogos.router)
 app.include_router(cobros_abm.router)
 app.include_router(informe_cobros.router)
+app.include_router(entidades_abm.router)
 
 # Adjuntos de WhatsApp (imágenes/docs subidos desde el panel) servidos como estáticos.
 storage_dir = Path("storage")

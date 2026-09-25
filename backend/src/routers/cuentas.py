@@ -155,13 +155,14 @@ def historial_contactos(
     db_auth: Session = Depends(get_auth_db),
     _user: dict = Depends(get_current_user),
 ):
-    """Historial de gestión (llamadas, whatsapp, etc.) de una cuenta, más reciente primero."""
+    """Historial de gestión (llamadas, whatsapp, etc.) de una cuenta, más reciente primero.
+    Incluye los dados de baja (la baja es lógica, no se borran del historial)."""
     from src.models.catalogos import Accion, Resultado
     from src.models.usuario import Usuario
 
     contactos = (
         db.query(Contacto)
-        .filter(Contacto.cuentas_id_cta == id_cta, Contacto.activo == "S")
+        .filter(Contacto.cuentas_id_cta == id_cta)
         .order_by(Contacto.fecha_contacto.desc(), Contacto.id_contacto.desc())
         .limit(limit)
         .all()
