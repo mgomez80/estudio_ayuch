@@ -27,8 +27,8 @@ COLUMNS = [
 
 
 def _ultimo_contacto_por_cuenta(db: Session) -> dict:
-    """Fecha + descripción (resultado, o acción si no hay resultado) del último
-    contacto activo de cada cuenta."""
+    """Fecha + descripción (resultado/acción + nota) del último contacto activo
+    de cada cuenta."""
     sub = (
         db.query(Contacto.cuentas_id_cta.label("id_cta"), func.max(Contacto.fecha_contacto).label("ultima_fecha"))
         .filter(Contacto.activo == "S")
@@ -36,7 +36,8 @@ def _ultimo_contacto_por_cuenta(db: Session) -> dict:
         .subquery()
     )
     filas = (
-        db.query(Contacto.cuentas_id_cta, Contacto.fecha_contacto, Resultado.desc_resultado, Accion.desc_accion)
+        db.query(Contacto.cuentas_id_cta, Contacto.fecha_contacto, Contacto.nota_contacto,
+                  Resultado.desc_resultado, Accion.desc_accion)
         .join(sub, (Contacto.cuentas_id_cta == sub.c.id_cta) & (Contacto.fecha_contacto == sub.c.ultima_fecha))
         .outerjoin(Resultado, Contacto.resultados_id_resultado == Resultado.id_resultado)
         .outerjoin(Accion, Contacto.acciones_id_accion == Accion.id_accion)
@@ -44,8 +45,14 @@ def _ultimo_contacto_por_cuenta(db: Session) -> dict:
         .all()
     )
     out = {}
-    for id_cta, fecha, desc_resultado, desc_accion in filas:
-        out[id_cta] = (fecha, desc_resultado or desc_accion)
+    for id_cta, fecha, nota_contacto, desc_resultado, desc_accion in filas:
+        desc = desc_resultado or desc_accion
+        nota = nota_contacto.decode() if nota_contacto else None
+        if desc and nota:
+            texto = f"{desc} — {nota}"
+        else:
+            texto = desc or nota
+        out[id_cta] = (fecha, texto)
     return out
 
 

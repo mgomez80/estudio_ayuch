@@ -4,7 +4,6 @@ import { descargarExcel } from "../../api/download";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatCard } from "../../components/ui/StatCard";
-import { FlagBadge } from "../../components/ui/Badge";
 import { toast } from "../../store/toastStore";
 import { fmtFecha } from "../../lib/fecha";
 import type { FilaInformeCobro, ConceptoCobroOut } from "../../types/domain";
@@ -18,6 +17,7 @@ export default function InformeCobros() {
   const [filas, setFilas] = useState<FilaInformeCobro[]>([]);
   const [loading, setLoading] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [guardandoId, setGuardandoId] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
 
   const qs = () => {
@@ -60,6 +60,22 @@ export default function InformeCobros() {
 
   const dinero = (valor: string | null) => (valor ? `$ ${Number(valor).toLocaleString("es-AR")}` : "—");
   const total = filas.reduce((acc, f) => acc + Number(f.importe || 0), 0);
+
+  const cambiarRendido = async (fila: FilaInformeCobro, nuevoValor: string) => {
+    const anterior = fila.rendido;
+    if (nuevoValor === anterior) return;
+    setGuardandoId(fila.id_cobros);
+    setFilas((prev) => prev.map((f) => (f.id_cobros === fila.id_cobros ? { ...f, rendido: nuevoValor } : f)));
+    try {
+      await api.patch(`/cobros/${fila.id_cobros}/rendido`, { rendido: nuevoValor });
+      toast.success("Rendido actualizado.");
+    } catch {
+      setFilas((prev) => prev.map((f) => (f.id_cobros === fila.id_cobros ? { ...f, rendido: anterior } : f)));
+      toast.error("No se pudo actualizar el rendido.");
+    } finally {
+      setGuardandoId(null);
+    }
+  };
 
   return (
     <div className="animate-in">
@@ -137,7 +153,17 @@ export default function InformeCobros() {
                   <td>{f.razon_social ?? "—"}</td>
                   <td>{f.concepto ?? "—"}</td>
                   <td className="font-data">{dinero(f.importe)}</td>
-                  <td><FlagBadge value={f.rendido} labels={["Sí", "No"]} tones={["success", "warning"]} /></td>
+                  <td>
+                    <select
+                      value={f.rendido ?? "N"}
+                      onChange={(e) => cambiarRendido(f, e.target.value)}
+                      disabled={guardandoId === f.id_cobros}
+                      className="form-input !py-1 !text-xs"
+                    >
+                      <option value="S">Sí</option>
+                      <option value="N">No</option>
+                    </select>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -141,6 +141,34 @@ def crear_cobro(
     return _cobro_a_out(nuevo, concepto.desc_concepto, None)
 
 
+class RendidoUpdateIn(BaseModel):
+    rendido: str  # "S" | "N"
+
+
+@router.patch("/cobros/{id_cobros}/rendido", response_model=CobroOut)
+def actualizar_rendido(
+    id_cobros: int,
+    payload: RendidoUpdateIn,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    if payload.rendido not in ("S", "N"):
+        raise HTTPException(status_code=400, detail="rendido debe ser 'S' o 'N'")
+
+    cobro = db.query(Cobro).filter(Cobro.id_cobros == id_cobros).first()
+    if not cobro:
+        raise HTTPException(status_code=404, detail="Cobro no encontrado")
+
+    cobro.rendido = payload.rendido
+    db.commit()
+    db.refresh(cobro)
+
+    concepto_desc = (
+        db.query(Concepto.desc_concepto).filter(Concepto.id_concepto == cobro.conceptos_id_concepto).scalar()
+    )
+    return _cobro_a_out(cobro, concepto_desc, None)
+
+
 @router.patch("/cobros/{id_cobros}/anular")
 def anular_cobro(
     id_cobros: int,
